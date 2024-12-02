@@ -23,16 +23,21 @@ export class App {
   private parse_hook({ body: { type, data } }: any): {
     error?: string;
   } {
+    console.debug({
+      method: "parse_hook",
+      body: { type, data },
+    });
+
     if (!data.conversation_id) {
       throw new Error("Invalid Converation Id");
     }
 
     const funcs = {
       ["create-request"]: () =>
-        this.request_meeintg(
+        this.request_meeting(
           data.conversation_id,
           data.web_hook,
-          data.web_hook_meta,
+          data.web_hook_headers,
         ),
       ["message"]: () =>
         this.receive_message(data.conversation_id, data.message),
@@ -53,10 +58,10 @@ export class App {
     return { error: undefined };
   }
 
-  private request_meeintg(
+  private request_meeting(
     conversation_id: string,
     web_hook: string,
-    web_hook_meta: any = {},
+    web_hook_headers: any = {},
   ): {
     error?: string;
   } {
@@ -66,7 +71,7 @@ export class App {
     this.conversation_manager.create_request(
       conversation_id,
       web_hook,
-      web_hook_meta,
+      web_hook_headers,
     );
     return { error: undefined };
   }
@@ -79,29 +84,47 @@ export class App {
     return this.conversation_manager.unfinished_requests();
   }
 
-  private accept_conversation({ params: { id }, body: { user_id } }: any) {
+  private async accept_conversation({
+    params: { id },
+    body: { user_id },
+  }: any) {
     console.debug(id, user_id);
     if (!user_id || !id) {
       throw new Error("Invalid Arguments");
     }
-    this.conversation_manager.accept_session(user_id, id);
+    await this.conversation_manager.accept_conversation(user_id, id);
     return { error: undefined };
   }
 
-  private reject_conversation({ params: { id }, body: { user_id } }: any) {
+  private async reject_conversation({
+    params: { id },
+    body: { user_id },
+  }: any) {
     if (!user_id || !id) {
       throw new Error("Invalid Arguments");
     }
-    this.conversation_manager.finish_session(user_id, id);
+    await this.conversation_manager.finish_conversation(user_id, id);
+    return { error: undefined };
+  }
+
+  private async send_message({ params: { id }, body: { user_id, body } }: any) {
+    if (!user_id || !id || !body) {
+      throw new Error("Invalid Arguments");
+    }
+    await this.conversation_manager.send_conversation_message(
+      user_id,
+      id,
+      body,
+    );
     return { error: undefined };
   }
 
   private define_routes() {
-    //this.app.onError(({ set, error }) => {
-    //  console.error(error);
-    //  set.status = 404;
-    //  return "Server Error";
-    //});
+    this.app.onError(({ set, error }) => {
+      console.error(error);
+      set.status = 500;
+      return { error };
+    });
 
     /// Botpres Side
     this.app.post("/hook", (request) => this.parse_hook(request));
@@ -113,13 +136,13 @@ export class App {
     this.app.post("/conversations/:id/reject", (request) =>
       this.reject_conversation(request),
     );
+    this.app.post("/conversations/:id/message", (request) =>
+      this.send_message(request),
+    );
     this.app.get("/conversations/unaccepted-list", () =>
       this.unaccepted_reuquests(),
     );
     this.app.get("/conversations/unfinished-list", () =>
-      this.unfinished_reuquests(),
-    );
-    this.app.post("/conversations/:id/message", () =>
       this.unfinished_reuquests(),
     );
 

@@ -6,7 +6,7 @@ export class Conversation {
   constructor(
     public readonly id: string,
     public readonly web_hook: string,
-    public readonly web_hook_meta: any = {},
+    public readonly web_hook_headers: any = {},
     public readonly requested_at: Date = new Date(),
   ) {}
 
@@ -50,10 +50,12 @@ export class ConversationManager {
   create_request(
     conversation_id: string,
     web_hook: string,
-    web_hook_meta: any,
+    web_hook_headers: any,
   ): Conversation {
-    const old_conversation = this.conversations.find(
-      (converstion) => converstion.id === conversation_id,
+    const old_conversation = this.find_conversation<Conversation | undefined>(
+      conversation_id,
+      (conv) => !conv.finished_at,
+      false,
     );
     if (old_conversation) {
       return old_conversation;
@@ -61,39 +63,43 @@ export class ConversationManager {
     const conversation = new Conversation(
       conversation_id,
       web_hook,
-      web_hook_meta,
+      web_hook_headers,
     );
     this.conversations.push(conversation);
-    console.debug(this.conversations, conversation);
+    /// TODO: CREATE CONVERSATION
     return conversation;
   }
 
-  finish_session(user_id: string, conversation_id: string): void {
-    const conversation = this.conversations.find(
-      (c) => c.id === conversation_id,
+  async finish_conversation(
+    user_id: string,
+    conversation_id: string,
+  ): Promise<void> {
+    const conversation = this.find_conversation(
+      conversation_id,
+      (conv) => !conv.accepted_at,
     );
-    if (!conversation) {
-      throw new Error("Conversation not found");
-    }
     conversation.accepted_by = conversation.accepted_by ?? user_id;
     conversation.finish(user_id);
-    this.send_message(conversation, {
+    /// TODO: UPDATE CONVERSTAION
+    await this.send_message(conversation, {
       type: EnumMessageType.FINISHED,
       body: "Rejected",
     });
   }
 
-  accept_session(user_id: string, conversation_id: string): void {
-    const conversation = this.conversations.find(
-      (conversation) => conversation.id === conversation_id,
+  async accept_conversation(
+    user_id: string,
+    conversation_id: string,
+  ): Promise<void> {
+    const conversation = this.find_conversation(
+      conversation_id,
+      (conv) => !conv.accepted_at,
     );
-    if (!conversation) {
-      throw new Error("Conversation not found");
-    }
     conversation.accept(user_id);
-    this.send_message(conversation, {
+    /// TODO: UPDATE CONVERSTAION
+    return this.send_message(conversation, {
       type: EnumMessageType.ACCEPTED,
-      body: "",
+      body: "Accepted",
     });
   }
 
@@ -105,18 +111,43 @@ export class ConversationManager {
     });
   }
 
+  async send_conversation_message(
+    user_id: string,
+    conversation_id: string,
+    message: string,
+  ): Promise<void> {
+    const conversation = this.find_conversation(conversation_id);
+    /// TODO: SAVE MESSAGE
+    return this.send_message(conversation, { type: "MSG", body: message });
+  }
+
   private async send_message(
     conversation: Conversation,
     data: { type: string; body: string },
   ): Promise<any> {
-    const fetchResult = await fetch(conversation.web_hook, {
+      const fetchResult = await fetch(conversation.web_hook, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        ...conversation.web_hook_meta,
+        ...conversation.web_hook_headers,
       },
       body: JSON.stringify(data),
     });
     return fetchResult.json();
+  }
+
+  private find_conversation<T = Conversation>(
+    conversation_id: string,
+    check_func?: (conv: Conversation) => boolean,
+    raise_error = true,
+  ): T {
+    const conversation = this.conversations.find(
+      (conv) =>
+        conv.id === conversation_id && (!check_func || check_func(conv)),
+    );
+    if (!conversation && raise_error) {
+      throw new Error("Conversation not found");
+    }
+    return conversation as T;
   }
 }
