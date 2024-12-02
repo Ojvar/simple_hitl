@@ -40,7 +40,7 @@ export class App {
           data.web_hook_headers,
         ),
       ["message"]: () =>
-        this.receive_message(data.conversation_id, data.message),
+        this.receive_message(data.conversation_id, data.body),
     };
     return funcs[type as keyof typeof funcs]();
   }

@@ -2,11 +2,11 @@
 
 # Functions for each command
 unaccepted_list() {
-  curl -X GET https://e104-178-252-140-6.ngrok-free.app/conversations/unaccepted-list
+  curl -X GET localhost:8000/conversations/unaccepted-list
 }
 
 unfinished_list() {
-  curl -X GET https://e104-178-252-140-6.ngrok-free.app/conversations/unfinished-list
+  curl -X GET localhost:8000/conversations/unfinished-list
 }
 
 accept() {
@@ -15,7 +15,7 @@ accept() {
   echo $conversation_id
   echo $user_id
   if [ -n "$conversation_id" ] && [ -n "$user_id" ]; then
-    curl -X POST https://e104-178-252-140-6.ngrok-free.app/conversations/${conversation_id}/accept \
+    curl -X POST localhost:8000/conversations/${conversation_id}/accept \
       -H "content-type: application/json" \
       -d "{\"user_id\": \"${user_id}\"}"
   else
@@ -27,7 +27,7 @@ reject() {
   local conversation_id=$1
   local user_id=$2
   if [ -n "$conversation_id" ] && [ -n "$user_id" ]; then
-    curl -X POST https://e104-178-252-140-6.ngrok-free.app/conversations/${conversation_id}/reject \
+    curl -X POST localhost:8000/conversations/${conversation_id}/reject \
       -H "content-type: application/json" \
       -d "{\"user_id\": \"${user_id}\"}"
   else
@@ -40,7 +40,7 @@ message() {
   local user_id=$2
   local body=$3
   if [ -n "$conversation_id" ] && [ -n "$user_id" ] && [ -n "$body" ]; then
-    curl -X POST https://e104-178-252-140-6.ngrok-free.app/conversations/${conversation_id}/message \
+    curl -X POST localhost:8000/conversations/${conversation_id}/message \
       -H "content-type: application/json" \
       -d "{\"user_id\": \"${user_id}\", \"body\": \"${body}\"}"
   else
